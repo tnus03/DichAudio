@@ -237,10 +237,7 @@ async def handle_approve_reject(update: Update, context: ContextTypes.DEFAULT_TY
         plan = PLANS.get(plan_key)
 
         if not plan:
-            await query.edit_message_caption(
-                caption="❌ Gói không hợp lệ.",
-                parse_mode="Markdown",
-            )
+            await query.edit_message_caption(caption="Goi khong hop le.")
             return
 
         try:
@@ -274,19 +271,16 @@ async def handle_approve_reject(update: Update, context: ContextTypes.DEFAULT_TY
                 logger.error(f"Không thể gửi tin nhắn cho user {telegram_id}: {e}")
 
             # Cập nhật message admin
+            msg_caption = getattr(query.message, "caption", "") or ""
             await query.edit_message_caption(
-                caption=query.message.caption + (
-                    f"\n\n✅ *Đã duyệt bởi Admin* `{admin_id}`\n"
-                    f"🔑 Key: `{key_code[:8]}...`"
-                ),
-                parse_mode="Markdown",
+                caption=msg_caption + f"\n\n✅ Da duyet boi Admin {admin_id}\nKey: {key_code[:8]}..."
             )
 
         except Exception as e:
-            logger.error(f"Lỗi duyệt key: {e}")
+            logger.error(f"Loi duyet key: {e}")
+            msg_caption = getattr(query.message, "caption", "") or ""
             await query.edit_message_caption(
-                caption=query.message.caption + "\n\n❌ *Lỗi khi tạo key*",
-                parse_mode="Markdown",
+                caption=msg_caption + "\n\n❌ Loi khi tao key"
             )
 
     elif data.startswith("reject_"):
@@ -297,20 +291,18 @@ async def handle_approve_reject(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await context.bot.send_message(
                 chat_id=int(telegram_id),
-                text="❌ *Yêu cầu kích hoạt của bạn đã bị từ chối.*\n\n"
-                     "Vui lòng kiểm tra lại thông tin chuyển khoản và thử lại. "
-                     "Nếu cần hỗ trợ, hãy liên hệ admin.",
-                parse_mode="Markdown",
+                text="❌ Yeu cau kich hoat cua ban da bi tu choi.\n\n"
+                     "Vui long kiem tra lai thong tin chuyen khoan va thu lai. "
+                     "Neu can ho tro, hay lien he admin.",
             )
+
         except Exception as e:
-            logger.error(f"Không thể gửi tin nhắn từ chối: {e}")
+            logger.error(f"Khong the gui tin nhan tu choi: {e}")
 
         # Cập nhật message admin
+        msg_caption = getattr(query.message, "caption", "") or ""
         await query.edit_message_caption(
-            caption=query.message.caption + (
-                f"\n\n❌ *Đã từ chối bởi Admin* `{admin_id}`"
-            ),
-            parse_mode="Markdown",
+            caption=msg_caption + f"\n\n❌ Da tu choi boi Admin {admin_id}"
         )
 
 
@@ -347,22 +339,27 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        msg = "📋 *Danh sách License Key của bạn:*\n\n"
+        msg = "Danh sach License Key cua ban:\n\n"
         for key in keys:
             status_emoji = {
                 "AVAILABLE": "🟢",
                 "ACTIVATED": "🔵",
                 "EXPIRED": "🔴",
-            }.get(key.status.value, "⚪")
+            }.get(str(key.status.value), "⚪")
 
-            expired = key.expired_at.strftime("%d/%m/%Y") if key.expired_at else "N/A"
+            expired_str = "N/A"
+            if key.expired_at is not None:
+                try:
+                    expired_str = key.expired_at.strftime("%d/%m/%Y")
+                except Exception:
+                    expired_str = str(key.expired_at)
             msg += (
-                f"{status_emoji} `{key.key_code[:16]}...`\n"
-                f"   • Trạng thái: {key.status.value}\n"
-                f"   • Hạn: {expired}\n\n"
+                f"{status_emoji} {str(key.key_code)[:16]}...\n"
+                f"   Trang thai: {str(key.status.value)}\n"
+                f"   Han: {expired_str}\n\n"
             )
 
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await update.message.reply_text(msg)
 
     except Exception as e:
         logger.error(f"Lỗi kiểm tra status: {e}")
