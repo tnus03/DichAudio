@@ -1,0 +1,31 @@
+[tool.pylint]
+max-line-length = 120
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "C0301",  # line-too-long
+    "E0611",  # no-name-in-module (PyQt6 dynamic imports)
+    "E0401",  # import-error (faster-whisper, edge-tts stubs)
+    "R0903",  # too-few-public-methods
+    "R0902",  # too-many-instance-attributes
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "R0915",  # too-many-statements
+    "R0917",  # too-many-positional-arguments
+    "R1702",  # too-many-nested-blocks
+    "R1705",  # no-else-return
+    "R0912",  # too-many-branches
+    "R1710",  # inconsistent-return-statements
+    "W0718",  # broad-exception-caught
+]
+
+[tool.pylint.MASTER]
+score = "no"
+
+[tool.pyright]
+# Suppress false positives từ Telegram Bot API (callback_query, message có thể None)
+reportOptionalMemberAccess = false
+reportOptionalSubscript = false
+# Suppress PyQt6 dynamic import
+reportPossiblyUnboundVariable = false

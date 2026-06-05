@@ -1,0 +1,30 @@
+# DichAudio Render Config
+services:
+  - type: web
+    name: dichaudio
+    env: python
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: chmod +x start.sh && ./start.sh
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TRANSLATION_PROVIDER
+        value: auto
+      - key: WHISPER_MODEL_SIZE
+        value: tiny
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ADMIN_GROUP_ID
+        sync: false
+    healthCheckPath: /api/v1/health
+    autoDeploy: false

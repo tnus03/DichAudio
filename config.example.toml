@@ -1,0 +1,38 @@
+# DichAudio Configuration
+# Copy to config.toml and fill in your keys
+
+[database]
+# url = "sqlite+aiosqlite:///./dichaudio.db"
+# url = "mysql+asyncmy://user:pass@localhost:3306/dichaudio"
+
+[redis]
+# url = "redis://localhost:6379/0"
+
+[ai]
+# Translation provider: gemini, openai, deepseek
+provider = "gemini"
+gemini_key = ""
+openai_key = ""
+deepseek_key = ""
+
+[stt]
+# tiny, base, small, medium, large-v3
+model_size = "base"
+use_api = false
+
+[tts]
+voice = "vi-VN-NamMinhNeural"
+voice_fallback = "vi-VN-HoaiMyNeural"
+
+[cloudinary]
+cloud_name = ""
+api_key = ""
+api_secret = ""
+
+[telegram]
+bot_token = ""
+admin_group_id = 0
+proxy_url = ""
+
+[logging]
+level = "INFO"

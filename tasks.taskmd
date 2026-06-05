@@ -1,0 +1,62 @@
+# 🎯 Task List — Automated Video Translator & Reup Optimizer
+
+## Phase 1: Thiết Lập Dự Án
+- [x] Tạo cấu trúc thư mục (server/, client/)
+- [x] Viết requirements.md — Yêu cầu hệ thống
+- [x] Viết tasks.taskmd — Task list này
+- [x] Viết requirements.txt — Python dependencies
+
+## Phase 2: Database Layer
+- [x] Viết server/config.py — Cấu hình biến môi trường
+- [x] Viết server/database.py — SQLAlchemy engine & session
+- [x] Viết server/models.py — ORM models (User, LicenseKey, TranslationTask)
+- [x] Viết server/schemas.py — Pydantic schemas
+
+## Phase 3: Core AI Pipeline
+- [x] Viết server/utils/helpers.py — Utility functions (HWID, key gen)
+- [x] Viết server/core/stt.py — faster-whisper transcription
+- [x] Viết server/core/translator.py — Gemini 1.5 Flash translation
+- [x] Viết server/core/tts.py — Edge-TTS voice generation
+- [x] Viết server/core/video_editor.py — FFmpeg video editing
+- [x] Viết server/core/pipeline.py — Pipeline orchestrator
+
+## Phase 4: Task Queue & API
+- [x] Viết server/celery_app.py — Celery app configuration
+- [x] Viết server/tasks/video_tasks.py — Celery video processing task
+- [x] Viết server/api/translate.py — Translation endpoints
+- [x] Viết server/api/license.py — License management endpoints
+- [x] Viết server/main.py — FastAPI app entry point
+
+## Phase 5: Telegram Bot
+- [x] Viết server/bot/bot.py — Bot handlers & admin flow
+- [x] Viết server/bot/__main__.py — Bot entry point
+
+## Phase 6: Kiểm Thử
+- [x] Kiểm tra server: uvicorn server.main:app --reload
+- [x] Test API endpoints với Python requests
+- [x] Kiểm tra Streamlit WebUI
+- [ ] Kiểm tra Celery worker (cần Redis)
+- [ ] Kiểm tra Bot Telegram (cần token + proxy)
+
+## Phase 7: Nâng Cấp (2026-06-05)
+- [x] Fix pipeline.py: khởi tạo composer lazy-load
+- [x] Fix schemas.py: thêm bg_music, subtitles, translation_provider
+- [x] Thêm GET /api/v1/tasks endpoint
+- [x] Tạo .gitignore, static/style.css
+- [x] Celery fallback: chạy pipeline trực tiếp nếu không có Redis
+- [x] Hỗ trợ multiple translation providers (gemini, openai, deepseek)
+- [x] Cập nhật HTML dashboard dùng GET /tasks thay vì localStorage
+- [x] Auto-retry cho task thất bại (POST /tasks/{id}/retry, POST /tasks/retry-all)
+- [x] Đồng bộ port 8002 trên toàn bộ project
+- [x] Fix yt-dlp outdated → update lên 2026.3.17
+- [x] Fix faster-whisper tuple API → hỗ trợ cả old và new format
+- [x] Fix VAD filter quá aggressive → fallback không VAD
+- [x] Fix FFmpeg gauss_blur → gblur (xóa filter ở FFmpeg mới)
+- [x] Fix Gemini quota 429 → auto fallback qua gemini-1.5-flash → text gốc
+- [x] Thêm DEEPSEEK_API_KEY + AutoFallbackTranslator
+- [x] Edge-TTS 403 → update edge-tts 7.x + proxy support
+- [x] Ghi nhan: yt-dlp TikTok + Douyin extractors dang bi loi
+- [x] TikTok URL co chu ky thoi gian (expired ngay sau khi lay)
+- [x] Background processor dinh ky 5s de tu dong xu ly task PENDING
+- [x] Clean URL: tu dong loai bo query parameters
+- [x] Hỗ trợ Facebook, Instagram, Twitter video URLs
