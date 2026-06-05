@@ -150,6 +150,17 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 DichAudio Server đã dừng.")
 
 
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint — redirect to API docs."""
+    return {
+        "service": "DichAudio Server",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }
+
+
 app = FastAPI(
     title="DichAudio - Automated Video Translator",
     description=(
