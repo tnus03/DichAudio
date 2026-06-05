@@ -314,38 +314,61 @@ class VideoEditor:
 
     def burn_subtitles(self, input_path: str, output_path: str,
                        subtitles: list[dict], font_size: int = 24) -> str:
-        """Đốt phụ đề vào video bằng FFmpeg drawtext (hỗ trợ tiếng Việt)."""
-        w, h = self.get_video_resolution(input_path)
-        if not w or not h:
-            w, h = 1080, 1920
-        font = r"C:\Windows\Fonts\arial.ttf"
-        pos_y = int(h * 0.85)
-        filters = []
-        for sub in subtitles:
-            text = sub.get("text", "")
-            start = float(sub["start"])
-            duration = float(sub["end"]) - start
-            if not text.strip() or duration <= 0:
-                continue
-            safe = text.replace(":", "\\:").replace("'", "\\'").replace("\n", " ").replace("[", "\\[").replace("]", "\\]")
-            filters.append(
-                f"drawtext=text='{safe}':fontfile={font}:"
-                f"fontsize={font_size}:fontcolor=white:borderw=2:bordercolor=black:"
-                f"x=(w-text_w)/2:y={pos_y}:"
-                f"enable='between(t,{start},{start + duration})'"
-            )
-        if not filters:
+        """Đốt phụ đề bằng SRT file + FFmpeg subtitles filter."""
+        import os, tempfile
+
+        if not subtitles:
             return input_path
-        cmd = [self.ffmpeg, "-y", "-i", input_path, "-vf", ",".join(filters), "-c:a", "copy", output_path]
-        self._run_cmd(cmd, "Burn subtitles")
+
+        # Tao file SRT (ho tro Unicode day du)
+        srt_lines = []
+        for idx, sub in enumerate(subtitles, 1):
+            text = sub.get("text", "").strip()
+            start = float(sub.get("start", 0))
+            end = float(sub.get("end", 0))
+            if not text or start >= end:
+                continue
+
+            def fmt_time(secs):
+                h = int(secs // 3600)
+                m = int((secs % 3600) // 60)
+                s = int(secs % 60)
+                ms = int((secs - int(secs)) * 1000)
+                return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+            srt_lines.append(str(idx))
+            srt_lines.append(f"{fmt_time(start)} --> {fmt_time(end)}")
+            srt_lines.append(text)
+            srt_lines.append("")
+
+        if not srt_lines:
+            return input_path
+
+        # Ghi SRT file tam (trong cung thu muc voi output de tranh Windows ':' issue)
+        srt_content = "\n".join(srt_lines)
+        srt_path = os.path.join(os.path.dirname(output_path), "subtitles.srt")
+        with open(srt_path, "w", encoding="utf-8") as f:
+            f.write(srt_content)
+
+        # Windows: path co ':' gay loi cho subtitles filter
+        # Giai phap: doi working directory ve thu muc chua SRT, dung relative path
+        srt_dir = os.path.dirname(srt_path)
+        srt_name = os.path.basename(srt_path)
+        cmd = [self.ffmpeg, "-y", "-i", os.path.abspath(input_path),
+               "-vf", f"subtitles={srt_name}",
+               "-c:a", "copy", os.path.abspath(output_path)]
+        self._run_cmd(cmd, "Burn subtitles", cwd=srt_dir)
+        if os.path.exists(srt_path):
+            try: os.remove(srt_path)
+            except: pass
         return output_path
 
-    def _run_cmd(self, cmd: list[str], description: str = ""):
+    def _run_cmd(self, cmd: list[str], description: str = "", cwd: str = None):
         """Chạy FFmpeg command và log kết quả."""
         logger.info(f"🎬 {description}: {' '.join(cmd)}")
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=600  # 10 phút max
+                cmd, capture_output=True, text=True, timeout=600, cwd=cwd
             )
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "Unknown FFmpeg error"

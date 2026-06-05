@@ -321,7 +321,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*/start* — Chọn gói dịch vụ\n"
         "*/help* — Xem hướng dẫn\n"
         "*/status* — Kiểm tra license key của bạn\n\n"
-        "📞 *Liên hệ admin:* @admin\n"
+        "📞 *Liên hệ admin:* 0394396228\n"
         "📧 *Email:* ahihiyeuem2303.com",
         parse_mode="Markdown",
     )
