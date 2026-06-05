@@ -24,3 +24,9 @@ Thumbs.db
 
 # Config
 *.local.json
+
+# Build
+dist/
+build/
+*.spec
+__pycache__/

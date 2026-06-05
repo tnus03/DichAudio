@@ -17,9 +17,17 @@ class VideoEditor:
     Hỗ trợ các thao tác lách bản quyền và tùy biến theo yêu cầu.
     """
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
-        self.ffmpeg = ffmpeg_path
-        self.ffprobe = ffprobe_path
+    def __init__(self, ffmpeg_path: str = None, ffprobe_path: str = None):
+        # Auto-detect ffmpeg: resource folder > env > system PATH
+        import os
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        resource_dir = os.path.join(os.path.dirname(base), "resource")
+
+        local_ffmpeg = os.path.join(resource_dir, "ffmpeg.exe")
+        local_ffprobe = os.path.join(resource_dir, "ffprobe.exe")
+
+        self.ffmpeg = ffmpeg_path or (local_ffmpeg if os.path.exists(local_ffmpeg) else "ffmpeg")
+        self.ffprobe = ffprobe_path or (local_ffprobe if os.path.exists(local_ffprobe) else "ffprobe")
         self._check_ffmpeg()
 
     def _check_ffmpeg(self):
