@@ -322,7 +322,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*/help* — Xem hướng dẫn\n"
         "*/status* — Kiểm tra license key của bạn\n\n"
         "📞 *Liên hệ admin:* @admin\n"
-        "📧 *Email:* support@dichaudio.com",
+        "📧 *Email:* ahihiyeuem2303.com",
         parse_mode="Markdown",
     )
 

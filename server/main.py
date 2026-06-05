@@ -150,17 +150,6 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 DichAudio Server đã dừng.")
 
 
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint — redirect to API docs."""
-    return {
-        "service": "DichAudio Server",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/api/v1/health",
-    }
-
-
 app = FastAPI(
     title="DichAudio - Automated Video Translator",
     description=(
@@ -183,6 +172,12 @@ app.add_middleware(
 # ---------- ROUTERS ----------
 app.include_router(translate_router)
 app.include_router(license_router)
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint."""
+    return {"service": "DichAudio Server", "version": "1.0.0", "docs": "/docs"}
 
 
 @app.get("/api/v1/health", tags=["System"])
