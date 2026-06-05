@@ -406,13 +406,11 @@ def run_bot():
 
     logger.info("🤖 DichAudio Bot started. Polling...")
     try:
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    except RuntimeError as e:
-        if "main thread" in str(e):
-            # Fix for running in non-main thread
-            asyncio.run(application.run_polling(allowed_updates=Update.ALL_TYPES))
-        else:
-            raise
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=())
+    except Exception as e:
+        logger.error(f"Bot error: {e}")
 
 
 if __name__ == "__main__":
