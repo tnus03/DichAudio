@@ -377,12 +377,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def run_bot():
     """Khởi chạy Telegram Bot."""
+    import asyncio
+
     if not TELEGRAM_BOT_TOKEN:
         logger.error("❌ TELEGRAM_BOT_TOKEN chưa được cấu hình.")
-        return
-
-    if not ADMIN_GROUP_ID:
-        logger.error("❌ ADMIN_GROUP_ID chưa được cấu hình.")
         return
 
     builder = Application.builder().token(TELEGRAM_BOT_TOKEN)
@@ -399,11 +397,22 @@ def run_bot():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan_"))
-    application.add_handler(CallbackQueryHandler(handle_approve_reject, pattern="^(approve_|reject_)"))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_bill_photo))
+
+    # Admin handlers (only if ADMIN_GROUP_ID configured)
+    if ADMIN_GROUP_ID:
+        application.add_handler(CallbackQueryHandler(handle_approve_reject, pattern="^(approve_|reject_)"))
+        application.add_handler(MessageHandler(filters.PHOTO, handle_bill_photo))
+        logger.info(f"Admin handlers registered (group: {ADMIN_GROUP_ID})")
 
     logger.info("🤖 DichAudio Bot started. Polling...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except RuntimeError as e:
+        if "main thread" in str(e):
+            # Fix for running in non-main thread
+            asyncio.run(application.run_polling(allowed_updates=Update.ALL_TYPES))
+        else:
+            raise
 
 
 if __name__ == "__main__":

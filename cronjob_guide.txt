@@ -1,0 +1,18 @@
+Để server Render luôn tỉnh 24/7, bạn dùng cron-job.org miễn phí.
+
+**Bước 1:** Vào https://cron-job.org → **Sign Up** (đăng ký miễn phí)
+
+**Bước 2:** Đăng nhập → bấm **Create Cronjob**
+
+**Bước 3:** Điền thông tin:
+
+| Ô | Giá trị |
+|--|---------|
+| **Title** | `DichAudio Keep Alive` |
+| **URL** | `https://dichaudio.onrender.com/api/v1/health` |
+| **Schedule** | Every 10 minutes |
+| **Method** | `GET` |
+
+**Bước 4:** Bấm **Create**
+
+Done! Cron-job.org sẽ ping server mỗi 10 phút, Render không ngủ nữa.

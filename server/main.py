@@ -128,8 +128,8 @@ async def lifespan(app: FastAPI):
 
     # Chay Telegram Bot (neu co token)
     try:
-        from server.config import TELEGRAM_BOT_TOKEN, ADMIN_GROUP_ID, TELEGRAM_PROXY_URL
-        if TELEGRAM_BOT_TOKEN and ADMIN_GROUP_ID:
+        from server.config import TELEGRAM_BOT_TOKEN
+        if TELEGRAM_BOT_TOKEN:
             from server.bot.bot import run_bot
 
             def _start_bot():
@@ -141,6 +141,8 @@ async def lifespan(app: FastAPI):
             bot_thread = threading.Thread(target=_start_bot, daemon=True)
             bot_thread.start()
             logger.info("🤖 Telegram Bot started.")
+        else:
+            logger.info("Bot token not configured, skipping.")
     except Exception as e:
         logger.warning(f"Bot khong the khoi dong: {e}")
 
