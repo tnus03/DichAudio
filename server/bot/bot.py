@@ -407,7 +407,12 @@ def run_bot():
         asyncio.set_event_loop(loop)
         application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=())
     except Exception as e:
-        logger.error(f"Bot error: {e}")
+        err_str = str(e)
+        if "Conflict" in err_str:
+            logger.warning("Bot conflict: token dang duoc su dung boi instance khac (local hoac Render).")
+            logger.warning("Tat bot local truoc khi deploy, hoac dung bot_token rieng cho moi instance.")
+        else:
+            logger.error(f"Bot error: {e}")
 
 
 if __name__ == "__main__":

@@ -100,6 +100,9 @@ async def create_translation_task(
         "crop_bottom": opts.crop_bottom,
         "crop_left": opts.crop_left,
         "crop_right": opts.crop_right,
+        "custom_audio": opts.custom_audio,
+        "target_language": opts.target_language,
+        "voice_gender": opts.voice_gender,
     }
 
     # 3. Tạo TranslationTask
@@ -395,3 +398,165 @@ async def upload_video(
         "size": file_size,
         "message": "Video đã được upload và đang xử lý.",
     }
+
+
+@router.post("/merge", tags=["Merge"])
+async def merge_video_audio(
+    video: UploadFile = File(...),
+    audio: UploadFile = File(...),
+    license_key: str = Form(...),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Ghép video va audio. Upload ca 2 file, thay audio track cua video bang audio file.
+    """
+    from server.config import MEDIA_DIR
+
+    # Check license
+    from sqlalchemy import select
+    result = await session.execute(
+        select(LicenseKey).where(
+            LicenseKey.key_code == license_key,
+            LicenseKey.status == LicenseStatus.ACTIVATED,
+        )
+    )
+    license_key_obj = result.scalar_one_or_none()
+    if not license_key_obj:
+        raise HTTPException(status_code=403, detail="License Key không hợp lệ.")
+
+    # Save files
+    merge_dir = MEDIA_DIR / "merge"
+    merge_dir.mkdir(exist_ok=True)
+
+    import aiofiles, uuid
+    vid_path = str(merge_dir / f"{uuid.uuid4().hex}_{video.filename}")
+    aud_path = str(merge_dir / f"{uuid.uuid4().hex}_{audio.filename}")
+    out_path = str(merge_dir / f"merged_{uuid.uuid4().hex}.mp4")
+
+    async with aiofiles.open(vid_path, "wb") as f:
+        await f.write(await video.read())
+    async with aiofiles.open(aud_path, "wb") as f:
+        await f.write(await audio.read())
+
+    # Merge
+    from server.core.video_editor import VideoEditor
+    editor = VideoEditor()
+    try:
+        editor.replace_audio(vid_path, aud_path, out_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ghép thất bại: {e}")
+
+    return {
+        "video": video.filename,
+        "audio": audio.filename,
+        "output": out_path,
+        "size": os.path.getsize(out_path),
+        "message": "Ghép video + audio thành công!",
+    }
+
+
+@router.post("/dub-video", tags=["Dub"])
+async def dub_video(
+    source_url: str = Form(...),
+    target_video: UploadFile = File(...),
+    license_key: str = Form(...),
+    mirror: bool = Form(False),
+    blur_padding: bool = Form(False),
+    speed: float = Form(1.0),
+    translation_provider: str = Form("auto"),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Lay audio tu source_url, dich va TTS, roi ghep vao target_video.
+    """
+    from server.config import MEDIA_DIR
+    from server.tasks.video_tasks import update_task_status
+    from server.core.pipeline import PipelineOrchestrator
+    from server.core.video_editor import VideoEditor
+    from sqlalchemy import select
+    import aiofiles, uuid, shutil, json
+
+    # Check license
+    result = await session.execute(
+        select(LicenseKey).where(
+            LicenseKey.key_code == license_key,
+            LicenseKey.status == LicenseStatus.ACTIVATED,
+        )
+    )
+    lic = result.scalar_one_or_none()
+    if not lic:
+        raise HTTPException(status_code=403, detail="License Key không hợp lệ.")
+    if lic.expired_at and lic.expired_at < datetime.utcnow():
+        raise HTTPException(status_code=403, detail="License Key da het han.")
+
+    # Tao task
+    task = TranslationTask(
+        user_id=lic.user_id, source_url=source_url,
+        status=TaskStatus.PENDING, options={"translation_provider": translation_provider},
+        created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
+    )
+    session.add(task); await session.flush(); await session.refresh(task)
+    task_id = task.id; await session.commit()
+
+    task_dir = MEDIA_DIR / f"task_{task_id}"; task_dir.mkdir(parents=True, exist_ok=True)
+
+    # Luu target video
+    target_path = str(task_dir / f"target_{uuid.uuid4().hex}_{target_video.filename}")
+    async with aiofiles.open(target_path, "wb") as f:
+        await f.write(await target_video.read())
+
+    def run():
+        try:
+            # 1. Download source, STT, translate
+            orch = PipelineOrchestrator(translation_provider=translation_provider)
+            orch.set_status_callback(update_task_status)
+
+            update_task_status(task_id, "DOWNLOADING")
+            source_video = orch._download_video(source_url, task_dir)
+            if not source_video:
+                raise RuntimeError("Tai source video that bai")
+
+            update_task_status(task_id, "EXTRACTING_AUDIO")
+            audio_path = str(task_dir / "source_audio.wav")
+            orch.editor.extract_audio(source_video, audio_path)
+
+            update_task_status(task_id, "TRANSCRIBING")
+            segments = orch.stt.transcribe(audio_path)
+            if not segments:
+                raise RuntimeError("Khong nhan dien duoc giong noi")
+
+            update_task_status(task_id, "TRANSLATING")
+            translated = orch.translator.translate(segments)
+
+            update_task_status(task_id, "GENERATING_VOICE")
+            dubbed = orch._generate_voices(translated, task_dir)
+
+            # Chuan bi subtitle
+            subtitles = [{"start": s["start"], "end": s["end"], "text": s.get("translated_text", "")}
+                         for s in translated if s.get("translated_text", "").strip()]
+
+            # 2. Ap dung vao target video
+            update_task_status(task_id, "EDITING_AND_MERGING")
+            opts = {"mirror": mirror, "speed": speed, "blur_padding": blur_padding,
+                    "original_volume": 0.1, "subtitles": subtitles}
+            result_path = orch._edit_video(target_path, dubbed, task_dir, opts)
+
+            # 3. Upload
+            update_task_status(task_id, "UPLOADING")
+            url = orch._upload_to_cloudinary(result_path)
+            update_task_status(task_id, "COMPLETED" if url else "FAILED",
+                               translated_url=url or "",
+                               error_message="" if url else "Upload that bai")
+
+            # Cleanup
+            shutil.rmtree(task_dir, ignore_errors=True)
+
+        except Exception as e:
+            logger.error(f"Dub task {task_id} error: {e}")
+            update_task_status(task_id, "FAILED", error_message=str(e))
+
+    import threading
+    threading.Thread(target=run, daemon=True).start()
+
+    return {"task_id": task_id, "status": "PENDING",
+            "message": f"Dang xu ly source_url va ghep vao {target_video.filename}"}

@@ -40,9 +40,12 @@ class VideoOptions(BaseModel):
     bg_music: Optional[str] = None
     bg_music_volume: float = 0.05  # Âm lượng nhạc nền
     dubbed_volume: float = 1.0  # Âm lượng giọng dịch (0.0 - 1.0)
+    custom_audio: Optional[str] = None  # Đường dẫn file audio thay thế
 
     # === AI ===
     translation_provider: str = "auto"
+    target_language: str = "Vietnamese"  # Ngôn ngữ đích cho bản dịch
+    voice_gender: str = "Nam"  # Nam hoặc Nữ
 
 
 class TranslateRequest(BaseModel):

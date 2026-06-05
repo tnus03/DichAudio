@@ -97,7 +97,18 @@ def _process_pending_tasks():
                 if old_tasks:
                     logger.info(f"Cleanup: xoa {len(old_tasks)} task cu...")
                     for t in old_tasks:
-                        # Xoa media
+                        # Xoa video tren Cloudinary
+                        if t.translated_url and "cloudinary" in t.translated_url:
+                            try:
+                                import cloudinary
+                                from server.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+                                if CLOUDINARY_CLOUD_NAME:
+                                    cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET, secure=True)
+                                    public_id = t.translated_url.split("/")[-1].split(".")[0]
+                                    cloudinary.uploader.destroy(public_id, resource_type="video")
+                            except Exception as e:
+                                logger.debug(f"Cloudinary delete: {e}")
+                        # Xoa media local
                         task_dir = MEDIA_DIR / f"task_{t.id}"
                         if task_dir.exists():
                             shutil.rmtree(task_dir, ignore_errors=True)

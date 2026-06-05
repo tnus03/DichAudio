@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 
 class BaseTranslator(ABC):
     @abstractmethod
-    def translate(self, segments: list[dict], max_retries: int = 3) -> list[dict]:
+    def translate(self, segments: list[dict], max_retries: int = 3, target_language: str = "Vietnamese") -> list[dict]:
         ...
 
 
 PROMPT_TEMPLATE = """
-Translate the following dialogue segments to Vietnamese.
+Translate the following dialogue segments to {target_language}.
 Rules:
 - Keep exact start/end timestamps
-- Natural Vietnamese, context-aware
+- Natural {target_language}, context-aware
 - Keep proper nouns, technical terms
 - Return ONLY valid JSON array
 
@@ -43,10 +43,10 @@ class GeminiTranslator(BaseTranslator):
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def translate(self, segments: list[dict], max_retries: int = 3) -> list[dict]:
+    def translate(self, segments: list[dict], max_retries: int = 3, target_language: str = "Vietnamese") -> list[dict]:
         client = self._get_client()
         input_data = [{"start": s["start"], "end": s["end"], "original_text": s["text"]} for s in segments]
-        prompt = PROMPT_TEMPLATE.format(input_segments=json.dumps(input_data, ensure_ascii=False))
+        prompt = PROMPT_TEMPLATE.format(target_language=target_language, input_segments=json.dumps(input_data, ensure_ascii=False))
 
         for model in self._models:
             for attempt in range(max_retries):
@@ -85,11 +85,11 @@ class OpenAITranslator(BaseTranslator):
         self.model = model
         self.base_url = base_url
 
-    def translate(self, segments: list[dict], max_retries: int = 3) -> list[dict]:
+    def translate(self, segments: list[dict], max_retries: int = 3, target_language: str = "Vietnamese") -> list[dict]:
         import openai
         client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
         input_data = [{"start": s["start"], "end": s["end"], "original_text": s["text"]} for s in segments]
-        prompt = PROMPT_TEMPLATE.format(input_segments=json.dumps(input_data, ensure_ascii=False))
+        prompt = PROMPT_TEMPLATE.format(target_language=target_language, input_segments=json.dumps(input_data, ensure_ascii=False))
 
         for attempt in range(max_retries):
             try:
@@ -146,11 +146,11 @@ class AutoFallbackTranslator(BaseTranslator):
         if deepseek_key:
             self._providers.append(DeepSeekTranslator(api_key=deepseek_key))
 
-    def translate(self, segments: list[dict], max_retries: int = 2) -> list[dict]:
+    def translate(self, segments: list[dict], max_retries: int = 2, target_language: str = "Vietnamese") -> list[dict]:
         for provider in self._providers:
             try:
                 logger.info(f"AutoFallback: trying {type(provider).__name__}...")
-                result = provider.translate(segments, max_retries=max_retries)
+                result = provider.translate(segments, max_retries=max_retries, target_language=target_language)
                 # Check if result is actual translation or fallback (original text kept)
                 if result and result[0].get("translated_text") != result[0].get("original_text"):
                     logger.info(f"AutoFallback: {type(provider).__name__} succeeded!")

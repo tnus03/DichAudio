@@ -298,6 +298,29 @@ class VideoEditor:
         self._run_cmd(cmd, f"Rotate {angle}")
         return output_path
 
+    def replace_audio(self, video_path: str, audio_path: str, output_path: str) -> str:
+        """Thay thế audio track của video bằng audio file khác."""
+        cmd = [self.ffmpeg, "-y", "-i", video_path, "-i", audio_path,
+               "-c:v", "copy", "-map", "0:v:0", "-map", "1:a:0",
+               "-shortest", output_path]
+        self._run_cmd(cmd, "Replace audio")
+        return output_path
+
+    def merge_media(self, video_path: str, audio_path: str, output_path: str,
+                    video_offset: float = 0.0, audio_offset: float = 0.0) -> str:
+        """Ghép video va audio voi offset tuy chinh."""
+        import subprocess
+        cmd = [self.ffmpeg, "-y"]
+        if video_offset > 0:
+            cmd += ["-itsoffset", str(video_offset)]
+        cmd += ["-i", video_path]
+        if audio_offset > 0:
+            cmd += ["-itsoffset", str(audio_offset)]
+        cmd += ["-i", audio_path]
+        cmd += ["-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", output_path]
+        self._run_cmd(cmd, "Merge media")
+        return output_path
+
     def crop_video(self, input_path: str, output_path: str,
                    top: int = 0, bottom: int = 0, left: int = 0, right: int = 0) -> str:
         """Cắt viền video."""
@@ -350,14 +373,21 @@ class VideoEditor:
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
 
-        # Windows: path co ':' gay loi cho subtitles filter
-        # Giai phap: doi working directory ve thu muc chua SRT, dung relative path
-        srt_dir = os.path.dirname(srt_path)
-        srt_name = os.path.basename(srt_path)
-        cmd = [self.ffmpeg, "-y", "-i", os.path.abspath(input_path),
-               "-vf", f"subtitles={srt_name}",
-               "-c:a", "copy", os.path.abspath(output_path)]
-        self._run_cmd(cmd, "Burn subtitles", cwd=srt_dir)
+        # Windows: relative path + cwd de tranh ':' trong drive letter
+        # Linux: absolute path truc tiep
+        import platform
+        if platform.system() == "Windows":
+            srt_dir = os.path.dirname(srt_path)
+            srt_name = os.path.basename(srt_path)
+            cmd = [self.ffmpeg, "-y", "-i", os.path.abspath(input_path),
+                   "-vf", f"subtitles={srt_name}",
+                   "-c:a", "copy", os.path.abspath(output_path)]
+            self._run_cmd(cmd, "Burn subtitles", cwd=srt_dir)
+        else:
+            cmd = [self.ffmpeg, "-y", "-i", input_path,
+                   "-vf", f"subtitles={srt_path}",
+                   "-c:a", "copy", output_path]
+            self._run_cmd(cmd, "Burn subtitles")
         if os.path.exists(srt_path):
             try: os.remove(srt_path)
             except: pass

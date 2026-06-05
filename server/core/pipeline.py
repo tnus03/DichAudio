@@ -88,12 +88,68 @@ class PipelineOrchestrator:
         task_dir = MEDIA_DIR / f"task_{task_id}"
         task_dir.mkdir(parents=True, exist_ok=True)
 
+        check_mode = opts.get("mode", "full")
+
         video_path = None
         translated_url = ""
 
         try:
             # Check if local file upload
             is_local = source_url.startswith("upload://") or os.path.isfile(source_url)
+
+            # Audio-only mode: download/extract audio directly
+            if check_mode == "audio_only":
+                self._update_status(task_id, "DOWNLOADING")
+                if is_local:
+                    audio_path = source_url if not source_url.startswith("upload://") else str(MEDIA_DIR / "uploads" / source_url[9:])
+                else:
+                    video_tmp = self._download_video(source_url, task_dir)
+                    if not video_tmp:
+                        raise RuntimeError("Tai video that bai.")
+                    audio_path = str(task_dir / "audio.wav")
+                    self.editor.extract_audio(video_tmp, audio_path)
+
+                self._update_status(task_id, "TRANSCRIBING")
+                segments = self.stt.transcribe(audio_path)
+                if not segments:
+                    raise RuntimeError("Khong nhan dien duoc giong noi.")
+
+                self._update_status(task_id, "TRANSLATING")
+                target_lang = opts.get("target_language", "Vietnamese")
+                translated_segments = self.translator.translate(segments, target_language=target_lang)
+
+                self._update_status(task_id, "GENERATING_VOICE")
+                dubbed = self._generate_voices(translated_segments, task_dir)
+
+                if not dubbed:
+                    raise RuntimeError("TTS that bai, khong co audio dich.")
+
+                # Ghep cac segment audio lai voi nhau
+                import subprocess as sp
+                concat_file = str(task_dir / "concat.txt")
+                with open(concat_file, "w", encoding="utf-8") as f:
+                    for seg in dubbed:
+                        f.write(f"file '{seg['path']}'\n")
+
+                final_audio = str(task_dir / "dubbed_audio.mp3")
+                sp.run([self.editor.ffmpeg, "-y", "-f", "concat", "-safe", "0",
+                       "-i", concat_file, "-c", "copy", final_audio],
+                       capture_output=True, timeout=120)
+
+                if not os.path.exists(final_audio):
+                    raise RuntimeError("Ghep audio that bai.")
+
+                # Upload audio to Cloudinary
+                self._update_status(task_id, "UPLOADING")
+                translated_url = self._upload_to_cloudinary(final_audio)
+                if translated_url:
+                    self._update_status(task_id, "COMPLETED", translated_url=translated_url)
+                else:
+                    self._update_status(task_id, "FAILED", error_message="Upload audio that bai.")
+                shutil.rmtree(task_dir, ignore_errors=True)
+                return translated_url
+
+            # Normal mode: process video
             if is_local:
                 if source_url.startswith("upload://"):
                     local_path = str(MEDIA_DIR / "uploads" / source_url[9:])
@@ -129,19 +185,27 @@ class PipelineOrchestrator:
                 segments, str(task_dir / "segments_original.json")
             )
 
-            # === BƯỚC 4: DỊCH (Gemini) ===
+            # === BUOC 4: DICH ===
             self._update_status(task_id, "TRANSLATING")
-            translated_segments = self.translator.translate(segments)
+            target_lang = opts.get("target_language", "Vietnamese")
+            translated_segments = self.translator.translate(segments, target_language=target_lang)
             with open(
                 task_dir / "segments_translated.json", "w", encoding="utf-8"
             ) as f:
                 json.dump(translated_segments, f, ensure_ascii=False, indent=2)
 
-            # === BƯỚC 5: TTS (Edge-TTS) ===
+            # === BUOC 5: TTS hoac custom audio ===
             self._update_status(task_id, "GENERATING_VOICE")
-            dubbed_audio_paths = self._generate_voices(
-                translated_segments, task_dir
-            )
+            custom_audio = opts.get("custom_audio")
+            if custom_audio and os.path.exists(custom_audio):
+                logger.info(f"Su dung custom audio: {custom_audio}")
+                # Lay duration video de tao segment
+                video_dur = self.editor.get_video_duration(video_path)
+                dubbed_audio_paths = [{"path": custom_audio, "start": 0, "end": video_dur}]
+            else:
+                dubbed_audio_paths = self._generate_voices(
+                    translated_segments, task_dir
+                )
 
             # Chuẩn bị subtitle data từ bản dịch
             opts["subtitles"] = [
@@ -518,15 +582,17 @@ class PipelineOrchestrator:
             if current_input != final_output:
                 shutil.copy2(current_input, final_output)
 
-            # 9. Subtitles (dung FFmpeg drawtext)
+            # 9. Subtitles
             sub_data = options.get("subtitles")
             if isinstance(sub_data, list) and len(sub_data) > 0:
                 try:
                     sub_out = str(output_dir / "subtitled.mp4")
-                    final_output = self.editor.burn_subtitles(
+                    self.editor.burn_subtitles(
                         final_output, sub_out, sub_data,
                         font_size=int(options.get("subtitle_font_size", 24)),
                     )
+                    if os.path.exists(sub_out) and os.path.getsize(sub_out) > 100:
+                        final_output = sub_out
                 except Exception as e:
                     logger.warning(f"Subtitles failed: {e}, skipping.")
 
